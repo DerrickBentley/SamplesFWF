@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="samplesfwf.client/samplesfwf.client.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+  <Project Path="SamplesFWF.Server/SamplesFWF.Server.csproj" />
+</Solution>
