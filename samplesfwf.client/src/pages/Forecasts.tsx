@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Paper,
@@ -15,43 +15,55 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { getForecasts } from '../api/weather';
-import type { Forecast } from '../api/weather';
+import type { PaginatedForecasts, Forecast } from '../api/weather';
 
 export default function Forecasts() {
-  const [forecasts, setForecasts] = useState<Forecast[] | undefined>(undefined);
+  const [items, setItems] = useState<Forecast[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState(''); // Added missing state setter
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setDebouncedQuery(query.trim());
+      // Move to first page when the effective search term changes
+      setPage(0);
+    }, 350); // 350ms debounce delay
+
+    return () => {
+      clearTimeout(handle);
+    };
+  }, [query]);
+
+  // Fetch whenever page, rowsPerPage or debouncedQuery changes.
   useEffect(() => {
     let mounted = true;
 
     (async () => {
+      setLoading(true);
       try {
-        const data = await getForecasts();
-        if (mounted) setForecasts(data);
+        const data: PaginatedForecasts = await getForecasts(page, rowsPerPage, debouncedQuery);
+        if (mounted) {
+          setItems(data.items);
+          setTotalCount(data.totalCount);
+        }
       } catch {
-        // optional: handle or surface error state
-        if (mounted) setForecasts([]);
+        if (mounted) {
+          setItems([]);
+          setTotalCount(0);
+        }
+      } finally {
+        if (mounted) setLoading(false);
       }
     })();
 
     return () => {
       mounted = false;
     };
-  }, []);
-
-  const filtered = useMemo(() => {
-    if (!forecasts) return [];
-    const q = query.trim().toLowerCase();
-    if (!q) return forecasts;
-    return forecasts.filter((f) =>
-      f.date.toLowerCase().includes(q) ||
-      f.summary.toLowerCase().includes(q) ||
-      String(f.temperatureC).includes(q) ||
-      String(f.temperatureF).includes(q)
-    );
-  }, [forecasts, query]);
+  }, [page, rowsPerPage, debouncedQuery]);
 
   const handleChangePage = (_: React.MouseEvent<HTMLButtonElement> | null, newPage: number) => {
     setPage(newPage);
@@ -62,7 +74,7 @@ export default function Forecasts() {
     setPage(0);
   };
 
-  if (forecasts === undefined) {
+  if (loading) {
     return (
       <Typography component="p" sx={{ p: 2 }}>
         <em>
@@ -72,8 +84,6 @@ export default function Forecasts() {
       </Typography>
     );
   }
-
-  const paged = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
     <Box>
@@ -116,7 +126,7 @@ export default function Forecasts() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {paged.map((forecast) => (
+            {items.map((forecast) => (
               <TableRow key={forecast.date} hover>
                 <TableCell component="th" scope="row">
                   {forecast.date}
@@ -127,7 +137,7 @@ export default function Forecasts() {
               </TableRow>
             ))}
 
-            {paged.length === 0 && (
+            {items.length === 0 && (
               <TableRow>
                 <TableCell colSpan={4} align="center">
                   No results
@@ -139,7 +149,7 @@ export default function Forecasts() {
 
         <TablePagination
           component="div"
-          count={filtered.length}
+          count={totalCount}
           page={page}
           onPageChange={handleChangePage}
           rowsPerPage={rowsPerPage}
