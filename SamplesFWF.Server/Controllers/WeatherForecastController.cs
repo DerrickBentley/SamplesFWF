@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using SamplesFWF.Domain.Models;
+using SamplesFWF.Library.Services;
 
 namespace SamplesFWF.Server.Controllers
 {
@@ -6,21 +8,17 @@ namespace SamplesFWF.Server.Controllers
     [Route("[controller]")]
     public class WeatherForecastController : ControllerBase
     {
-        private static readonly string[] Summaries =
-        [
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        ];
+        private readonly IWeatherService _weatherService;
 
-        [HttpGet(Name = "GetWeatherForecast")]
-        public IEnumerable<WeatherForecast> Get()
+        public WeatherForecastController(IWeatherService weatherService)
         {
-            return Enumerable.Range(1, 5).Select(index => new WeatherForecast
-            {
-                Date = DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                TemperatureC = Random.Shared.Next(-20, 55),
-                Summary = Summaries[Random.Shared.Next(Summaries.Length)]
-            })
-            .ToArray();
+            _weatherService = weatherService;
+        }
+
+        [HttpGet]
+        public async Task<IEnumerable<Forecast>> Get()
+        {
+            return await _weatherService.GetForecastsAsync();
         }
     }
 }

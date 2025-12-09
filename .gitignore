@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/SamplesFWF.Server/weather.db
+/SamplesFWF.Server/weather.db-shm
+/SamplesFWF.Server/weather.db-wal
