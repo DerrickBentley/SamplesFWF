@@ -6,4 +6,5 @@
   <Project Path="SamplesFWF.Domain/SamplesFWF.Domain.csproj" Id="837cdf6b-b215-45e6-97be-626a6897c918" />
   <Project Path="SamplesFWF.Library/SamplesFWF.Library.csproj" Id="ad2d1c8d-c6f8-4982-81ec-c5b52c31bb89" />
   <Project Path="SamplesFWF.Server/SamplesFWF.Server.csproj" />
+  <Project Path="SamplesFWF.Tests/SamplesFWF.Tests.csproj" />
 </Solution>
