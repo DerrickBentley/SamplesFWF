@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using SamplesFWF.Library.Services;
 using SamplesFWF.Library.Models;
 using SamplesFWF.Domain.Models;
+using SamplesFWF.Library.Mapping;
 using System.Linq;
 using System.Threading.Tasks;
 using System;
@@ -25,13 +26,7 @@ namespace SamplesFWF.Server.Controllers
         {
             var result = await _weatherService.GetForecastsAsync(page: page, pageSize: pageSize, query: q);
 
-            var dtoItems = result.Items.Select(f => new ForecastDto
-            {
-                Date = f.Date.ToString("yyyy-MM-dd"),
-                TemperatureC = f.TemperatureC,
-                TemperatureF = f.TemperatureF,
-                Summary = f.Summary
-            }).ToList();
+            var dtoItems = result.Items.Select(ForecastMapper.ToDto).ToList();
 
             return new PagedResult<ForecastDto>(dtoItems, result.TotalCount);
         }
@@ -47,27 +42,13 @@ namespace SamplesFWF.Server.Controllers
                 return ValidationProblem(ModelState);
             }
 
-            // DTO Date validated by DateStringAttribute; parse with exact format.
-            var parsedDate = DateTime.ParseExact(dto.Date, "yyyy-MM-dd", CultureInfo.InvariantCulture);
-
-            var domain = new Forecast
-            {
-                Date = parsedDate.Date,
-                TemperatureC = dto.TemperatureC,
-                Summary = dto.Summary
-            };
+            var domain = ForecastMapper.ToDomain(dto);
 
             try
             {
                 var created = await _weatherService.CreateForecastAsync(domain);
 
-                var createdDto = new ForecastDto
-                {
-                    Date = created.Date.ToString("yyyy-MM-dd"),
-                    TemperatureC = created.TemperatureC,
-                    TemperatureF = created.TemperatureF,
-                    Summary = created.Summary
-                };
+                var createdDto = ForecastMapper.ToDto(created);
 
                 // Return 201 Created. You may adjust Location to point to a GET-by-date endpoint if added.
                 return CreatedAtAction(nameof(Get), null, createdDto);
@@ -90,14 +71,7 @@ namespace SamplesFWF.Server.Controllers
                 return ValidationProblem(ModelState);
             }
 
-            var parsedDate = DateTime.ParseExact(dto.Date, "yyyy-MM-dd", CultureInfo.InvariantCulture);
-
-            var domain = new Forecast
-            {
-                Date = parsedDate.Date,
-                TemperatureC = dto.TemperatureC,
-                Summary = dto.Summary
-            };
+            var domain = ForecastMapper.ToDomain(dto);
 
             var updated = await _weatherService.UpdateForecastAsync(domain);
             if (updated == null)
@@ -106,13 +80,7 @@ namespace SamplesFWF.Server.Controllers
                 return NotFound(new ValidationProblemDetails(ModelState) { Status = 404 });
             }
 
-            var updatedDto = new ForecastDto
-            {
-                Date = updated.Date.ToString("yyyy-MM-dd"),
-                TemperatureC = updated.TemperatureC,
-                TemperatureF = updated.TemperatureF,
-                Summary = updated.Summary
-            };
+            var updatedDto = ForecastMapper.ToDto(updated);
 
             return Ok(updatedDto);
         }
