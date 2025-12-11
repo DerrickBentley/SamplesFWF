@@ -12,6 +12,10 @@ namespace SamplesFWF.Library.Services
     public interface IWeatherService
     {
         Task<PagedResult<Forecast>> GetForecastsAsync(int page, int pageSize, string? query = null);
+
+        Task<Forecast> CreateForecastAsync(Forecast forecast);
+
+        Task<Forecast?> UpdateForecastAsync(Forecast forecast);
     }
 
     public class WeatherService : IWeatherService
@@ -52,6 +56,44 @@ namespace SamplesFWF.Library.Services
             var totalFiltered = filtered.Count();
             var itemsFiltered = filtered.Skip(page * pageSize).Take(pageSize).ToList();
             return new PagedResult<Forecast>(itemsFiltered, totalFiltered);
+        }
+
+        public async Task<Forecast> CreateForecastAsync(Forecast forecast)
+        {
+            if (forecast == null) throw new ArgumentNullException(nameof(forecast));
+
+            // normalize date to date-only
+            forecast.Date = forecast.Date.Date;
+
+            var exists = await _db.Forecasts.AnyAsync(f => f.Date == forecast.Date);
+            if (exists)
+            {
+                throw new InvalidOperationException($"A forecast for date {forecast.Date:yyyy-MM-dd} already exists.");
+            }
+
+            _db.Forecasts.Add(forecast);
+            await _db.SaveChangesAsync();
+
+            return forecast;
+        }
+
+        public async Task<Forecast?> UpdateForecastAsync(Forecast forecast)
+        {
+            if (forecast == null) throw new ArgumentNullException(nameof(forecast));
+
+            // normalize date to date-only
+            var targetDate = forecast.Date.Date;
+
+            var existing = await _db.Forecasts.FirstOrDefaultAsync(f => f.Date == targetDate);
+            if (existing == null) return null;
+
+            // update mutable properties
+            existing.TemperatureC = forecast.TemperatureC;
+            existing.Summary = forecast.Summary;
+
+            await _db.SaveChangesAsync();
+
+            return existing;
         }
     }
 }
