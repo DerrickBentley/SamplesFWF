@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Paper,
@@ -11,47 +11,68 @@ import {
   TextField,
   InputAdornment,
   TablePagination,
-  Typography
+  Typography,
+  Button,
+  IconButton,
+  Stack,
+  LinearProgress
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import EditIcon from '@mui/icons-material/Edit';
+import AddIcon from '@mui/icons-material/Add';
 import { getForecasts } from '../api/weather';
-import type { Forecast } from '../api/weather';
+import type { PaginatedForecasts, Forecast } from '../api/weather';
+import ForecastEditor from '../components/ForecastEditor';
 
 export default function Forecasts() {
-  const [forecasts, setForecasts] = useState<Forecast[] | undefined>(undefined);
+  const [items, setItems] = useState<Forecast[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [loading, setLoading] = useState(true);
+
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorInitial, setEditorInitial] = useState<Forecast | null>(null);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setDebouncedQuery(query.trim());
+      // Move to first page when the effective search term changes
+      setPage(0);
+    }, 350);
+
+    return () => {
+      clearTimeout(handle);
+    };
+  }, [query]);
+
+  const fetchPage = async (p = page, pageSize = rowsPerPage, q = debouncedQuery) => {
+    setLoading(true);
+    try {
+      const data: PaginatedForecasts = await getForecasts(p, pageSize, q);
+      setItems(data.items);
+      setTotalCount(data.totalCount);
+    } catch {
+      setItems([]);
+      setTotalCount(0);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
-
     (async () => {
-      try {
-        const data = await getForecasts();
-        if (mounted) setForecasts(data);
-      } catch {
-        // optional: handle or surface error state
-        if (mounted) setForecasts([]);
-      }
+      if (!mounted) return;
+      await fetchPage();
     })();
-
     return () => {
       mounted = false;
     };
-  }, []);
-
-  const filtered = useMemo(() => {
-    if (!forecasts) return [];
-    const q = query.trim().toLowerCase();
-    if (!q) return forecasts;
-    return forecasts.filter((f) =>
-      f.date.toLowerCase().includes(q) ||
-      f.summary.toLowerCase().includes(q) ||
-      String(f.temperatureC).includes(q) ||
-      String(f.temperatureF).includes(q)
-    );
-  }, [forecasts, query]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, rowsPerPage, debouncedQuery]);
 
   const handleChangePage = (_: React.MouseEvent<HTMLButtonElement> | null, newPage: number) => {
     setPage(newPage);
@@ -62,24 +83,35 @@ export default function Forecasts() {
     setPage(0);
   };
 
-  if (forecasts === undefined) {
-    return (
-      <Typography component="p" sx={{ p: 2 }}>
-        <em>
-          Loading... Please refresh once the ASP.NET backend has started. See{' '}
-          <a href="https://aka.ms/jspsintegrationreact">https://aka.ms/jspsintegrationreact</a> for more details.
-        </em>
-      </Typography>
-    );
-  }
+  const openNew = () => {
+    setEditorInitial(null);
+    setEditorOpen(true);
+  };
 
-  const paged = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const openEdit = (f: Forecast) => {
+    setEditorInitial(f);
+    setEditorOpen(true);
+  };
+
+  const handleSaved = async (_saved: Forecast) => {
+    // after save, re-fetch the first page to show created/updated item
+    await fetchPage(0, rowsPerPage, debouncedQuery);
+  };
 
   return (
     <Box>
-      <Typography variant="h4" id="tableLabel" sx={{ mb: 1 }}>
-        Weather forecast
-      </Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Typography variant="h4" id="tableLabel">
+            Weather forecast
+          </Typography>
+        </Stack>
+
+        <Button startIcon={<AddIcon />} variant="contained" onClick={openNew}>
+          New
+        </Button>
+      </Stack>
+
       <Typography variant="body2" sx={{ mb: 2 }}>
         This component demonstrates fetching data from the server.
       </Typography>
@@ -89,7 +121,6 @@ export default function Forecasts() {
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
-            setPage(0);
           }}
           placeholder="Search by date, summary, or temperature..."
           fullWidth
@@ -103,6 +134,10 @@ export default function Forecasts() {
           }}
           aria-label="Search forecasts"
         />
+
+        {/* Keep the search input in the DOM while fetching so focus is preserved.
+            Show a subtle loading indicator rather than unmounting the page. */}
+        {loading && <LinearProgress sx={{ mt: 1 }} />}
       </Paper>
 
       <TableContainer component={Paper}>
@@ -113,10 +148,11 @@ export default function Forecasts() {
               <TableCell align="right">Temp. (C)</TableCell>
               <TableCell align="right">Temp. (F)</TableCell>
               <TableCell>Summary</TableCell>
+              <TableCell align="center">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {paged.map((forecast) => (
+            {items.map((forecast) => (
               <TableRow key={forecast.date} hover>
                 <TableCell component="th" scope="row">
                   {forecast.date}
@@ -124,13 +160,18 @@ export default function Forecasts() {
                 <TableCell align="right">{forecast.temperatureC}</TableCell>
                 <TableCell align="right">{forecast.temperatureF}</TableCell>
                 <TableCell>{forecast.summary}</TableCell>
+                <TableCell align="center">
+                  <IconButton size="small" onClick={() => openEdit(forecast)} aria-label="Edit">
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                </TableCell>
               </TableRow>
             ))}
 
-            {paged.length === 0 && (
+            {items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} align="center">
-                  No results
+                <TableCell colSpan={5} align="center">
+                  {loading ? 'Loading...' : 'No results'}
                 </TableCell>
               </TableRow>
             )}
@@ -139,7 +180,7 @@ export default function Forecasts() {
 
         <TablePagination
           component="div"
-          count={filtered.length}
+          count={totalCount}
           page={page}
           onPageChange={handleChangePage}
           rowsPerPage={rowsPerPage}
@@ -147,6 +188,13 @@ export default function Forecasts() {
           rowsPerPageOptions={[5, 10, 25]}
         />
       </TableContainer>
+
+      <ForecastEditor
+        open={editorOpen}
+        initial={editorInitial ?? undefined}
+        onClose={() => setEditorOpen(false)}
+        onSaved={handleSaved}
+      />
     </Box>
   );
 }
