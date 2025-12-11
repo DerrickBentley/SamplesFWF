@@ -13,7 +13,8 @@ import {
 import type { Forecast } from '../api/weather';
 import { createForecast, updateForecast } from '../api/weather';
 import { normalizeServerBody } from '../utils/normalizeServerBody';
-import { mapServerErrors, FieldErrors } from '../utils/serverErrorUtils';
+import { mapServerErrors } from '../utils/serverErrorUtils';
+import type { FieldErrors } from '../utils/serverErrorUtils';
 
 interface ForecastEditorProps {
   open: boolean;
